@@ -35,6 +35,15 @@ func Mount(ctx context.Context, id string) (string, error) {
 }
 
 func Pull(ctx context.Context, image string, insecure bool) error {
+	// Check if image exists locally first
+	checkCmd := exec.CommandContext(ctx, "podman", "image", "exists", image)
+	if err := checkCmd.Run(); err == nil {
+		// Image exists locally, skip pull
+		klog.V(1).InfoS("image exists locally, skipping pull", "image", image)
+		return nil
+	}
+
+	// Image doesn't exist locally, try to pull it
 	args := []string{"pull"}
 	if insecure {
 		args = append(args, "--tls-verify=false")

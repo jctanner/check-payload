@@ -33,6 +33,11 @@ var applicationDeps = []string{
 	"podman",
 }
 
+var applicationDepsImageScan = []string{
+	"nm",
+	"podman",
+}
+
 var applicationDepsNodeScan = []string{
 	"nm",
 	"rpm",
@@ -174,6 +179,7 @@ func main() {
 			}
 			config.PrintExceptions, _ = cmd.Flags().GetBool("print-exceptions")
 			config.UseRPMScan, _ = cmd.Flags().GetBool("rpm-scan")
+			config.EnablePythonCryptoScan, _ = cmd.Flags().GetBool("python-crypto-scan")
 			results = scan.RunPayloadScan(ctx, &config)
 			return nil
 		},
@@ -182,6 +188,7 @@ func main() {
 	scanPayload.Flags().StringP("file", "f", "", "payload from json file")
 	scanPayload.MarkFlagsMutuallyExclusive("url", "file")
 	scanPayload.Flags().Bool("rpm-scan", false, "use RPM scan (same as during node scan)")
+	scanPayload.Flags().Bool("python-crypto-scan", false, "validate Python cryptography FIPS compliance")
 
 	// Define the 'local' subcommand for scanning local unpacked images
 	localCmd := &cobra.Command{
@@ -205,14 +212,16 @@ func main() {
 			}
 			return nil
 		},
-		Run: func(_ *cobra.Command, _ []string) {
+		Run: func(cmd *cobra.Command, _ []string) {
 			ctx, cancel := context.WithTimeout(context.Background(), config.TimeLimit)
 			defer cancel()
+			config.EnablePythonCryptoScan, _ = cmd.Flags().GetBool("python-crypto-scan")
 			results = scan.RunLocalScan(ctx, &config, localBundlePath)
 		},
 	}
 
 	localCmd.Flags().StringVar(&localBundlePath, "path", "", "Path to the local unpacked image bundle")
+	localCmd.Flags().Bool("python-crypto-scan", false, "validate Python cryptography FIPS compliance")
 
 	// Add the 'local' subcommand to 'scanCmd'
 	scanCmd.AddCommand(localCmd)
@@ -229,11 +238,13 @@ func main() {
 			root, _ := cmd.Flags().GetString("root")
 			walkScan, _ := cmd.Flags().GetBool("walk-scan")
 			config.UseRPMScan = !walkScan
+			config.EnablePythonCryptoScan, _ = cmd.Flags().GetBool("python-crypto-scan")
 			results = scan.RunNodeScan(ctx, &config, root)
 		},
 	}
 	scanNode.Flags().String("root", "", "root path to scan")
 	scanNode.Flags().Bool("walk-scan", false, "scan all files using directory tree walk")
+	scanNode.Flags().Bool("python-crypto-scan", false, "validate Python cryptography FIPS compliance")
 	_ = scanNode.MarkFlagRequired("root")
 
 	scanImage := &cobra.Command{
@@ -241,18 +252,20 @@ func main() {
 		Aliases:      []string{"operator"},
 		SilenceUsage: true,
 		PreRunE: func(_ *cobra.Command, _ []string) error {
-			return scan.ValidateApplicationDependencies(applicationDeps)
+			return scan.ValidateApplicationDependencies(applicationDepsImageScan)
 		},
 		Run: func(cmd *cobra.Command, _ []string) {
 			ctx, cancel := context.WithTimeout(context.Background(), timeLimit)
 			defer cancel()
 			config.ContainerImage, _ = cmd.Flags().GetString("spec")
 			config.UseRPMScan, _ = cmd.Flags().GetBool("rpm-scan")
+			config.EnablePythonCryptoScan, _ = cmd.Flags().GetBool("python-crypto-scan")
 			results = scan.RunOperatorScan(ctx, &config)
 		},
 	}
 	scanImage.Flags().String("spec", "", "payload url")
 	scanImage.Flags().Bool("rpm-scan", false, "use RPM scan (same as during node scan)")
+	scanImage.Flags().Bool("python-crypto-scan", false, "validate Python cryptography FIPS compliance")
 	_ = scanImage.MarkFlagRequired("spec")
 
 	scanJavaImage := &cobra.Command{
@@ -260,13 +273,14 @@ func main() {
 		Aliases:      []string{"java"},
 		SilenceUsage: true,
 		PreRunE: func(_ *cobra.Command, _ []string) error {
-			return scan.ValidateApplicationDependencies(applicationDeps)
+			return scan.ValidateApplicationDependencies(applicationDepsImageScan)
 		},
 		Run: func(cmd *cobra.Command, _ []string) {
 			ctx, cancel := context.WithTimeout(context.Background(), timeLimit)
 			defer cancel()
 			config.ContainerImage, _ = cmd.Flags().GetString("spec")
 			config.UseRPMScan, _ = cmd.Flags().GetBool("rpm-scan")
+			config.EnablePythonCryptoScan, _ = cmd.Flags().GetBool("python-crypto-scan")
 			config.JavaDisabledAlgorithms = append(config.JavaDisabledAlgorithms, javaDisabledAlgorithms...)
 			config.Java = true
 			results = scan.RunOperatorScan(ctx, &config)
@@ -274,6 +288,7 @@ func main() {
 	}
 	scanJavaImage.Flags().String("spec", "", "java payload url")
 	scanJavaImage.Flags().Bool("rpm-scan", false, "use RPM scan (same as during node scan)")
+	scanJavaImage.Flags().Bool("python-crypto-scan", false, "validate Python cryptography FIPS compliance")
 	scanJavaImage.Flags().StringSliceVar(&javaDisabledAlgorithms, "disabled-algorithms", nil, "additional algorithms that java should be disabling in FIPS mode")
 	_ = scanJavaImage.MarkFlagRequired("spec")
 

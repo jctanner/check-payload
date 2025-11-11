@@ -390,6 +390,32 @@ func walkDirScan(ctx context.Context, cfg *types.Config, tag *v1.TagReference, c
 	}
 	results.Append(scanResult)
 
+	// Python cryptography validation (only if enabled via flag)
+	if cfg.EnablePythonCryptoScan {
+		pythonValidations := validations.ValidatePythonCryptography(ctx, mountPath)
+		for _, pv := range pythonValidations {
+			pythonScanResult := types.NewScanResult().SetTag(tag).SetComponent(component)
+			if !pv.IsCompliant {
+				// Convert violations into scan results
+				for _, violation := range pv.Violations {
+					// Build full path: packagePath + modulePath
+					fullPath := filepath.Join(pv.Installation.PackagePath, violation.ModulePath)
+					
+					violationResult := types.NewScanResult().
+						SetTag(tag).
+						SetComponent(component).
+						SetPath(fullPath).
+						SetError(violation.Error)
+					results.Append(violationResult)
+				}
+			} else {
+				// Compliant installation - add success result
+				pythonScanResult.Success()
+				results.Append(pythonScanResult)
+			}
+		}
+	}
+
 	errIgnoreLists := []types.ErrIgnoreList{cfg.ErrIgnores}
 
 	if tag != nil {

@@ -21,6 +21,7 @@ type Config struct {
 	OutputFormat            string        `json:"output_format"`
 	Parallelism             int           `json:"parallelism"`
 	Java                    bool          `json:"java"`
+	EnablePythonCryptoScan  bool          `json:"enable_python_crypto_scan"`
 	PrintExceptions         bool          `json:"print_exceptions"`
 	PullSecret              string        `json:"pull_secret"`
 	TimeLimit               time.Duration `json:"time_limit"`
